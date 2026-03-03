@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "PW Locator Grabber",
-  "version": "1.0",
-  "permissions": ["sidePanel", "activeTab", "scripting", "storage"],
+  "name": "Robot Locator Grabber for AI",
+  "version": "1.6",
+  "permissions": ["sidePanel", "activeTab", "scripting"],
   "background": { "service_worker": "background.js" },
   "side_panel": { "default_path": "sidepanel/panel.html" },
-  "action": { "default_title": "Open PW Grabber" },
+  "action": { "default_title": "Open Grabber" },
   "content_scripts": [{
     "matches": ["<all_urls>"],
-    "js": ["utils/dom-utils.js", "content.js"]
+    "js": ["utils/dom-utils.js", "content.js"],
+    "run_at": "document_start"
   }]
 }

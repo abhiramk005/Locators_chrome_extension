@@ -1,31 +1,164 @@
-/* panel.css */
-body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; padding: 12px; margin: 0; }
-.header { 
-  display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; 
-  border-bottom: 1px solid #333; position: sticky; top: 0; background: #121212; z-index: 10; 
-}
-h3 { margin: 0; color: #00ff00; font-size: 15px; }
-.button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-button { 
-  cursor: pointer; padding: 8px; border-radius: 4px; border: none; 
-  font-weight: bold; font-size: 11px; transition: 0.2s; 
+/* sidepanel/panel.css */
+
+:root {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --card-hover: #263449;
+  --border: #334155;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
 }
 
-#inspect-btn { background: #333; color: #fff; }
-#inspect-btn.active { background: #d32f2f; }
-#copy-all-btn { background: #4CAF50; color: white; }
-#download-btn { background: #1976d2; color: white; grid-column: span 2; }
-
-#list { margin-top: 12px; }
-.item { 
-  background: #1e1e1e; padding: 10px; border-radius: 6px; margin-bottom: 8px; 
-  border-left: 3px solid #00ff00; position: relative; 
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 16px;
+  margin: 0;
+  font-size: 13px;
 }
-.item .purpose { color: #81c784; font-size: 12px; margin-bottom: 4px; padding-right: 25px;}
-code { display: block; background: #000; padding: 5px; color: #a9dc76; font-size: 10px; border-radius: 3px; }
 
-.remove-btn { 
-  position: absolute; top: 8px; right: 8px; background: transparent; 
-  color: #ff5252; border: none; font-size: 16px; padding: 0; line-height: 1;
+/* HEADER */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
 }
-.remove-btn:hover { color: #ff1744; }
+
+h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+/* BUTTON GRID */
+.button-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* BUTTON BASE */
+button {
+  cursor: pointer;
+  padding: 9px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+}
+
+/* Button Variants */
+#inspect-btn {
+  background: var(--primary);
+  color: white;
+}
+
+#inspect-btn:hover {
+  background: var(--primary-hover);
+}
+
+#inspect-btn.active {
+  background: var(--danger);
+}
+
+#extract-dom-btn {
+  background: var(--warning);
+  color: black;
+}
+
+#copy-all-btn {
+  background: var(--success);
+  color: white;
+}
+
+#download-btn {
+  background: #6366f1;
+  color: white;
+}
+
+#clear-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  grid-column: span 2;
+}
+
+#clear-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* LIST AREA */
+#list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ITEM CARD */
+.item {
+  background: var(--card);
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  position: relative;
+  transition: 0.15s ease;
+}
+
+.item:hover {
+  background: var(--card-hover);
+}
+
+.item .purpose {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+/* CODE BLOCK */
+code {
+  display: block;
+  background: #0b1220;
+  padding: 8px;
+  color: #7dd3fc;
+  font-size: 11px;
+  border-radius: 6px;
+  word-break: break-word;
+  border: 1px solid #1e293b;
+}
+
+/* REMOVE BUTTON */
+.remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.remove-btn:hover {
+  color: var(--danger);
+}

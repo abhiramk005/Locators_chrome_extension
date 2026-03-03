@@ -10,6 +10,30 @@ const DomUtils = {
     return el;
   },
 
+  // Scans the entire page for interactive elements currently in the DOM
+  crawlPage: () => {
+    const interactiveSelectors = [
+      'button', 'a[href]', 'input', 'select', 'textarea',
+      '[role="button"]', '[role="link"]', '[role="textbox"]', '[role="checkbox"]'
+    ];
+    
+    const elements = document.querySelectorAll(interactiveSelectors.join(','));
+    const results = [];
+
+    elements.forEach(el => {
+      // Basic visibility check: ignore hidden elements (common in JS frameworks)
+      const style = window.getComputedStyle(el);
+      if (el.offsetWidth > 0 && el.offsetHeight > 0 && style.visibility !== 'hidden' && style.display !== 'none') {
+        results.push({
+          locator: DomUtils.generateLocator(el),
+          metadata: DomUtils.getElementMetadata(el)
+        });
+      }
+    });
+
+    return results;
+  },
+
   getElementMetadata: (el) => {
     const parent = el.closest('header, footer, form, nav, section');
     const context = parent ? (parent.id || parent.tagName.toLowerCase()) : "body";
@@ -19,7 +43,7 @@ const DomUtils = {
       type: el.type || null,
       text: el.innerText?.trim().substring(0, 50) || null,
       placeholder: el.placeholder || null,
-      ariaLabel: el.getAttribute('aria-label') || null, //
+      ariaLabel: el.getAttribute('aria-label') || null,
       nameAttr: el.getAttribute('name') || null,
       role: el.getAttribute('role') || DomUtils.getImplicitRole(el),
       location_context: `in ${context}`

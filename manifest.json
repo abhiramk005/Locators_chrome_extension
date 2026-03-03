@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "PW Locator Grabber",
+  "version": "1.0",
+  "permissions": ["sidePanel", "activeTab", "scripting", "storage"],
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "sidepanel/panel.html" },
+  "action": { "default_title": "Open PW Grabber" },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["utils/dom-utils.js", "content.js"]
+  }]
+}

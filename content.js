@@ -29,7 +29,13 @@ function createHighlighter() {
 // Initialize on first load
 createHighlighter();
 
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // Heartbeat — lets the panel know this content script is alive
+  if (msg.type === 'PING') {
+    sendResponse({ alive: true });
+    return true;
+  }
+
   if (msg.type === 'TOGGLE_INSPECT') {
     isInspecting = msg.value;
     if (isInspecting) {

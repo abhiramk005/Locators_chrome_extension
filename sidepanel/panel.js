@@ -11,15 +11,6 @@ const countBadge = document.getElementById('count-badge');
 let sessionElements = [];
 
 // ── DEDUPLICATION ──
-// Two layers to catch redundancy from different angles:
-//
-// locatorSeen — exact locator string match (fastest, most common case)
-//   e.g. same "css=button.submit" seen twice → skip
-//
-// fingerprintSeen — semantic fingerprint: role + type + text + context
-//   catches the same logical element appearing with a different locator
-//   e.g. after a DOM update shifts nth-child indices, the locator changes
-//   but it's clearly the same "Submit button in form" → skip
 const locatorSeen = new Set();
 const fingerprintSeen = new Set();
 
@@ -47,9 +38,13 @@ function updateCount() {
   if (countBadge) countBadge.textContent = sessionElements.length;
 }
 
+// ── Send highlight message to active tab ──
+async function sendToActiveTab(message) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab) chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+}
+
 // ── Ping-based content script health check ──
-// After an extension reload, content scripts in open tabs go dead.
-// This pings first — if no response, re-injects both scripts before proceeding.
 async function ensureContentScript(tabId) {
   const alive = await new Promise(resolve => {
     chrome.tabs.sendMessage(tabId, { type: 'PING' }, (response) => {
@@ -66,7 +61,6 @@ async function ensureContentScript(tabId) {
 }
 
 // ── CLICK & EXTRACT ──
-// Hover to highlight, click to capture a single element
 inspectBtn.onclick = async () => {
   const active = inspectBtn.classList.toggle('active');
   inspectBtn.textContent = active ? 'STOP' : 'CLICK & EXTRACT';
@@ -79,7 +73,6 @@ inspectBtn.onclick = async () => {
 };
 
 // ── EXTRACT DOM ──
-// One-shot manual crawl of everything currently visible on the page
 extractBtn.onclick = async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab) {
@@ -89,14 +82,10 @@ extractBtn.onclick = async () => {
 };
 
 // ── AUTO CRAWL ──
-// Turns on MutationObserver in content.js which watches the DOM continuously.
-// Any DOM change (modal, dropdown, SPA navigation, lazy load) triggers
-// a debounced re-crawl. Panel deduplication handles the rest.
 autoCrawlBtn.onclick = async () => {
   const active = autoCrawlBtn.classList.toggle('active');
   autoCrawlBtn.textContent = active ? 'AUTO CRAWL: ON' : 'AUTO CRAWL: OFF';
   chrome.runtime.sendMessage({ type: 'AUTO_CRAWL_SYNC', value: active });
-
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab) {
     await ensureContentScript(tab.id);
@@ -115,7 +104,7 @@ clearBtn.onclick = () => {
   }
 };
 
-// ── INCOMING MESSAGES FROM CONTENT SCRIPT ──
+// ── INCOMING MESSAGES ──
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'DISPLAY_LOCATOR') {
     processNewElements([{ locator: msg.locator, metadata: msg.metadata }], null, 'click');
@@ -168,12 +157,24 @@ function renderItem(data) {
     <div class="purpose">${data.ai_purpose}</div>
     <code>${data.locator}</code>
   `;
+
+  // ── Highlight on hover ──
+  // When mouse enters a panel item, send the locator to content.js
+  // which finds the element on the page and draws an amber highlight box on it.
+  div.addEventListener('mouseenter', () => {
+    sendToActiveTab({ type: 'HIGHLIGHT_LOCATOR', locator: data.locator });
+  });
+  div.addEventListener('mouseleave', () => {
+    sendToActiveTab({ type: 'CLEAR_HIGHLIGHT' });
+  });
+
   div.querySelector('.remove-btn').onclick = () => {
     locatorSeen.delete(data.locator);
     sessionElements = sessionElements.filter(el => el.id !== data.id);
     div.remove();
     updateCount();
   };
+
   list.prepend(div);
 }
 
@@ -212,16 +213,22 @@ copyAllBtn.onclick = () => {
 };
 
 function buildExportData() {
-  return sessionElements.map(el => ({
-    purpose: el.ai_purpose,
-    locator: el.locator,
-    source: el.source,
-    url: el.url,
-    context: {
-      tag: el.technical_details.tagName,
-      type: el.technical_details.type,
-      name: el.technical_details.nameAttr,
-      ariaLabel: el.technical_details.ariaLabel || undefined
-    }
-  }));
+  return sessionElements.map(el => {
+    // Build context — omit any key whose value is null/undefined/empty
+    const ctx = {};
+    if (el.technical_details.tagName)  ctx.tag      = el.technical_details.tagName;
+    if (el.technical_details.type)     ctx.type     = el.technical_details.type;
+    if (el.technical_details.nameAttr) ctx.name     = el.technical_details.nameAttr;
+    if (el.technical_details.ariaLabel) ctx.ariaLabel = el.technical_details.ariaLabel;
+
+    // Build top-level entry — omit source, and omit url if null
+    const entry = {
+      purpose: el.ai_purpose,
+      locator: el.locator,
+    };
+    if (el.url) entry.url = el.url;
+    if (Object.keys(ctx).length > 0) entry.context = ctx;
+
+    return entry;
+  });
 }

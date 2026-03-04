@@ -194,3 +194,12 @@ code {
   letter-spacing: 0.3px;
   opacity: 0.7;
 }
+
+/* HIGHLIGHT ON HOVER — item glows amber when mouse is over it */
+.item:hover {
+  border-color: #f59e0b;
+  background: var(--card-hover);
+}
+.item:hover code {
+  color: #f59e0b;
+}

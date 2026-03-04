@@ -10,6 +10,52 @@ const DomUtils = {
     return el;
   },
 
+  // ── Noise containers — elements inside these are not worth capturing ──
+  // Virtual keyboards, emoji pickers, per-message actions, tooltips etc.
+  // are all UI chrome that produces deep, fragile, useless locators.
+  _noiseContainerSelector: [
+    '[class*="keyboard-layout"]', '[class*="keyboard-row"]', '[class*="keyboard-buttons"]',
+    '[class*="emoji-picker"]', '[class*="emoji-grid"]', '[class*="emoji-mart"]',
+    '[class*="context-menu"]', '[class*="dropdown-menu"]',
+    '[class*="tooltip"]', '[class*="popover"]',
+    '[class*="color-picker"]', '[class*="date-picker"]', '[class*="time-picker"]',
+    '[class*="pagination"]',
+    '[aria-hidden="true"]'
+  ].join(','),
+
+  // ── Quality gate for generated locators ──
+  // Returns false for locators that are too fragile to be useful:
+  // - Deep structural paths (>6 levels) where the element itself has no identity
+  // - Pure nth-of-type chains with no semantic anchors
+  _isUsableLocator: (locator, el) => {
+    if (!locator) return false;
+
+    // Reject WARNING locators — not unique, useless for automation
+    if (locator.includes('WARNING')) return false;
+
+    // Only apply structural checks to css= paths that use nth-of-type (Tier 10 fallback)
+    if (locator.startsWith('css=') && locator.includes(':nth-of-type')) {
+      const depth = (locator.match(/>/g) || []).length;
+
+      // Reject anything deeper than 5 levels — too fragile regardless of element identity.
+      // A 6-level path breaks if any ancestor is reordered, added, or removed.
+      if (depth > 5) return false;
+
+      // Reject paths whose ROOT segment is a generic container with nth-of-type.
+      // e.g. "div.container-fluid.available:nth-of-type(13)" as the first segment
+      // means the path is anchored to a positional index that shifts constantly.
+      const rootSegment = locator.slice(4).split('>')[0].trim();
+      // Reject paths rooted on a generic positional container (depth must also be > 2
+      // so shallow paths like "div.wrapper:nth-of-type(2) > button.save" still pass)
+      const rootIsPositional = depth > 2 &&
+        rootSegment.includes(':nth-of-type') &&
+        /^div\.(container|wrapper|row|col|layout|panel|page|app|main|content)/.test(rootSegment);
+      if (rootIsPositional) return false;
+    }
+
+    return true;
+  },
+
   crawlPage: () => {
     const interactiveSelectors = [
       'button', 'a[href]', 'input', 'select', 'textarea',
@@ -17,15 +63,27 @@ const DomUtils = {
     ];
     const elements = document.querySelectorAll(interactiveSelectors.join(','));
     const results = [];
+
     elements.forEach(el => {
+      // ── Visibility check ──
       const style = window.getComputedStyle(el);
-      if (el.offsetWidth > 0 && el.offsetHeight > 0 && style.visibility !== 'hidden' && style.display !== 'none') {
-        results.push({
-          locator: DomUtils.generateLocator(el),
-          metadata: DomUtils.getElementMetadata(el)
-        });
-      }
+      if (el.offsetWidth === 0 || el.offsetHeight === 0 ||
+          style.visibility === 'hidden' || style.display === 'none') return;
+
+      // ── Noise filter — skip elements inside noisy UI containers ──
+      if (el.closest(DomUtils._noiseContainerSelector)) return;
+
+      const locator = DomUtils.generateLocator(el);
+
+      // ── Quality gate — skip elements that produce unusable locators ──
+      if (!DomUtils._isUsableLocator(locator, el)) return;
+
+      results.push({
+        locator,
+        metadata: DomUtils.getElementMetadata(el)
+      });
     });
+
     return results;
   },
 
@@ -42,6 +100,30 @@ const DomUtils = {
       role: el.getAttribute('role') || DomUtils.getImplicitRole(el),
       location_context: `in ${context}`
     };
+  },
+
+  // ── Finds an element on the page by its locator string ──
+  // Used by the highlight-on-hover feature in the panel.
+  findByLocator: (locator) => {
+    try {
+      if (locator.startsWith('id=')) {
+        return document.getElementById(locator.slice(3));
+      }
+      if (locator.startsWith('css=')) {
+        return document.querySelector(locator.slice(4));
+      }
+      if (locator.startsWith('xpath=')) {
+        const result = document.evaluate(
+          locator.slice(6), document, null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE, null
+        );
+        return result.singleNodeValue;
+      }
+      if (locator.startsWith('name=')) {
+        return document.querySelector(`[name="${locator.slice(5)}"]`);
+      }
+    } catch { return null; }
+    return null;
   },
 
   _isUnique: (css) => {
@@ -75,16 +157,22 @@ const DomUtils = {
     const stableClasses = [...el.classList].filter(DomUtils._isStableClass);
     if (stableClasses.length === 0) return null;
 
+    // Attempt 1: all stable classes on element alone
     const allClassSel = `${tag}.${stableClasses.map(c => CSS.escape(c)).join('.')}`;
     if (DomUtils._isUnique(allClassSel)) return `css=${allClassSel}`;
 
+    // Attempt 2: each individual class alone
     for (const c of stableClasses) {
       const single = `${tag}.${CSS.escape(c)}`;
       if (DomUtils._isUnique(single)) return `css=${single}`;
     }
 
+    // Attempt 3 & 4: walk ancestors, try scoping with BOTH stable IDs and stable classes
+    // This is the key fix — pages without stable IDs (like chat apps) still have
+    // stable semantic classes on ancestor containers we can scope against
     let ancestor = el.parentElement;
     while (ancestor && ancestor !== document.body) {
+      // Scope with stable ancestor ID (original behaviour)
       if (ancestor.id && DomUtils._isStableId(ancestor.id)) {
         const scoped = `#${CSS.escape(ancestor.id)} ${allClassSel}`;
         if (DomUtils._isUnique(scoped)) return `css=${scoped}`;
@@ -92,8 +180,25 @@ const DomUtils = {
           const scoped2 = `#${CSS.escape(ancestor.id)} ${tag}.${CSS.escape(c)}`;
           if (DomUtils._isUnique(scoped2)) return `css=${scoped2}`;
         }
-        break;
+        break; // found a stable ID ancestor — don't walk further
       }
+
+      // Scope with stable ancestor CLASSES (new — handles ID-less pages like chat apps)
+      const ancestorStableClasses = [...ancestor.classList].filter(DomUtils._isStableClass);
+      if (ancestorStableClasses.length > 0) {
+        const ancestorTag = ancestor.tagName.toLowerCase();
+        const ancestorSel = `${ancestorTag}.${ancestorStableClasses.map(c => CSS.escape(c)).join('.')}`;
+        // Only use this ancestor as scope if IT is unique on the page
+        if (DomUtils._isUnique(ancestorSel)) {
+          const scoped = `${ancestorSel} ${allClassSel}`;
+          if (DomUtils._isUnique(scoped)) return `css=${scoped}`;
+          for (const c of stableClasses) {
+            const scoped2 = `${ancestorSel} ${tag}.${CSS.escape(c)}`;
+            if (DomUtils._isUnique(scoped2)) return `css=${scoped2}`;
+          }
+        }
+      }
+
       ancestor = ancestor.parentElement;
     }
     return null;
@@ -144,11 +249,29 @@ const DomUtils = {
     // TIER 2: Stable ID
     if (el.id && DomUtils._isStableId(el.id)) return `id=${el.id}`;
 
-    // TIER 3: Aria label
+    // TIER 3: Aria label — try alone, then scoped under nearest meaningful ancestor
     const ariaLabel = el.getAttribute('aria-label');
     if (ariaLabel) {
       const css = `${tag}[aria-label="${ariaLabel}"]`;
       if (DomUtils._isUnique(css)) return `css=${css}`;
+
+      // Not unique alone — scope with nearest ancestor that has a stable id or unique class
+      let ancestor = el.parentElement;
+      while (ancestor && ancestor !== document.body) {
+        // Try scoping under stable ancestor ID
+        if (ancestor.id && DomUtils._isStableId(ancestor.id)) {
+          const scoped = `#${CSS.escape(ancestor.id)} ${css}`;
+          if (DomUtils._isUnique(scoped)) return `css=${scoped}`;
+          break;
+        }
+        // Try scoping under ancestor with a stable unique class
+        const ancestorClasses = [...ancestor.classList].filter(DomUtils._isStableClass);
+        for (const c of ancestorClasses) {
+          const scoped = `${ancestor.tagName.toLowerCase()}.${CSS.escape(c)} ${css}`;
+          if (DomUtils._isUnique(scoped)) return `css=${scoped}`;
+        }
+        ancestor = ancestor.parentElement;
+      }
     }
 
     // TIER 4: name attribute
@@ -176,12 +299,29 @@ const DomUtils = {
       if (DomUtils._isUnique(css)) return `css=${css}`;
     }
 
-    // TIER 7: Exact visible text
+    // TIER 7: Exact visible text — try alone, then scoped under nearest ancestor
     const fullText = el.innerText?.trim();
     if (fullText && fullText.length > 0 && fullText.length <= 50 && !/\d{2,}/.test(fullText)) {
       const escaped = fullText.replace(/'/g, "\\'");
       const xpath = `//${tag}[normalize-space(.)='${escaped}']`;
       if (DomUtils._isUniqueXPath(xpath)) return `xpath=${xpath}`;
+
+      // Not unique alone — scope under nearest stable ancestor
+      let ancestor = el.parentElement;
+      while (ancestor && ancestor !== document.body) {
+        if (ancestor.id && DomUtils._isStableId(ancestor.id)) {
+          const scoped = `//*[@id='${ancestor.id}']//${tag}[normalize-space(.)='${escaped}']`;
+          if (DomUtils._isUniqueXPath(scoped)) return `xpath=${scoped}`;
+          break;
+        }
+        const ancestorClasses = [...ancestor.classList].filter(DomUtils._isStableClass);
+        for (const c of ancestorClasses) {
+          const scoped = `css=${ancestor.tagName.toLowerCase()}.${CSS.escape(c)} ${tag}`;
+          const scopedXpath = `//${ancestor.tagName.toLowerCase()}[contains(@class,'${c}')]//${tag}[normalize-space(.)='${escaped}']`;
+          if (DomUtils._isUniqueXPath(scopedXpath)) return `xpath=${scopedXpath}`;
+        }
+        ancestor = ancestor.parentElement;
+      }
     }
 
     // TIER 8: href for anchors

@@ -107,7 +107,12 @@ clearBtn.onclick = () => {
 // ── INCOMING MESSAGES ──
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'DISPLAY_LOCATOR') {
-    processNewElements([{ locator: msg.locator, metadata: msg.metadata }], null, 'click');
+    // Get the active tab URL so click-captured elements are grouped
+    // under the same page as crawled elements from that URL
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const url = tabs[0]?.url || null;
+      processNewElements([{ locator: msg.locator, metadata: msg.metadata }], url, 'click');
+    });
   }
   if (msg.type === 'CRAWL_RESULTS') {
     processNewElements(msg.results, msg.url, msg.source);
@@ -212,23 +217,48 @@ copyAllBtn.onclick = () => {
   });
 };
 
+function buildElement(el) {
+  // Build context — omit any key whose value is null/undefined/empty
+  const ctx = {};
+  if (el.technical_details.tagName)   ctx.tag      = el.technical_details.tagName;
+  if (el.technical_details.type)      ctx.type     = el.technical_details.type;
+  if (el.technical_details.nameAttr)  ctx.name     = el.technical_details.nameAttr;
+  if (el.technical_details.ariaLabel) ctx.ariaLabel = el.technical_details.ariaLabel;
+
+  const entry = {
+    purpose: el.ai_purpose,
+    locator: el.locator,
+  };
+  if (Object.keys(ctx).length > 0) entry.context = ctx;
+  return entry;
+}
+
 function buildExportData() {
-  return sessionElements.map(el => {
-    // Build context — omit any key whose value is null/undefined/empty
-    const ctx = {};
-    if (el.technical_details.tagName)  ctx.tag      = el.technical_details.tagName;
-    if (el.technical_details.type)     ctx.type     = el.technical_details.type;
-    if (el.technical_details.nameAttr) ctx.name     = el.technical_details.nameAttr;
-    if (el.technical_details.ariaLabel) ctx.ariaLabel = el.technical_details.ariaLabel;
+  // Separate click-captured (no url) from page-crawled (has url)
+  const unanchored = sessionElements.filter(el => !el.url);
+  const crawled    = sessionElements.filter(el =>  el.url);
 
-    // Build top-level entry — omit source, and omit url if null
-    const entry = {
-      purpose: el.ai_purpose,
-      locator: el.locator,
-    };
-    if (el.url) entry.url = el.url;
-    if (Object.keys(ctx).length > 0) entry.context = ctx;
-
-    return entry;
+  // Group crawled elements by URL — preserving insertion order
+  const pageMap = new Map();
+  crawled.forEach(el => {
+    if (!pageMap.has(el.url)) pageMap.set(el.url, []);
+    pageMap.get(el.url).push(buildElement(el));
   });
+
+  const result = {};
+
+  // Click-captured elements — no page grouping needed
+  if (unanchored.length > 0) {
+    result.elements = unanchored.map(buildElement);
+  }
+
+  // Page-grouped elements — URL appears once per page
+  if (pageMap.size > 0) {
+    result.pages = [...pageMap.entries()].map(([url, elements]) => ({
+      url,
+      elements
+    }));
+  }
+
+  return result;
 }

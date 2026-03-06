@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Robot Locator Grabber for AI",
-  "version": "1.7",
-  "permissions": ["sidePanel", "activeTab", "scripting"],
+  "name": "Robot Test Generator",
+  "version": "2.0",
+  "permissions": ["sidePanel", "activeTab", "scripting", "storage","tabs"],
+  "host_permissions": ["https://api.anthropic.com/*"],
   "background": { "service_worker": "background.js" },
   "side_panel": { "default_path": "sidepanel/panel.html" },
-  "action": { "default_title": "Open Grabber" },
+  "action": { "default_title": "Open Robot Generator" },
   "content_scripts": [{
     "matches": ["<all_urls>"],
     "js": ["utils/dom-utils.js", "content.js"],

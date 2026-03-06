@@ -5,21 +5,217 @@
   <link rel="stylesheet" href="panel.css">
 </head>
 <body>
-  <div class="header">
-    <div class="title-row">
-      <h3>Extract DOM For AI</h3>
-      <span id="count-badge" class="count-badge">0</span>
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="top-left">
+      <span class="logo">⬡</span>
+      <span class="top-title">Robot Generator</span>
     </div>
-    <div class="button-group">
-      <button id="inspect-btn">CLICK & EXTRACT</button>
-      <button id="extract-dom-btn">EXTRACT DOM</button>
-      <button id="auto-crawl-btn">AUTO CRAWL: OFF</button>
-      <button id="copy-all-btn">COPY JSON</button>
-      <button id="download-btn">DOWNLOAD</button>
-      <button id="clear-btn">CLEAR ALL SESSION</button>
+    <button id="settings-btn" class="gear-btn" title="API Keys">⚙</button>
+  </div>
+
+  <!-- SETTINGS POPUP -->
+  <div id="settings-popup" class="settings-popup hidden">
+    <div class="popup-header">
+      <span>API Keys</span>
+      <button id="close-settings-btn" class="icon-close">✕</button>
+    </div>
+    <div id="active-key-info" class="active-key-info"></div>
+    <div id="keys-list"></div>
+    <div class="popup-divider"></div>
+    <div class="add-key-header">
+      <span class="add-key-title">Add New Key</span>
+      <button id="toggle-add-key-btn" class="icon-plus" title="Add new key">＋</button>
+    </div>
+    <div class="add-key-form hidden" id="add-key-form">
+      <input id="new-key-label" type="text" placeholder="Label (e.g. Personal, Work)" />
+      <input id="new-key-value" type="password" placeholder="sk-ant-..." />
+      <button id="add-key-btn" class="btn-save">Save Key</button>
     </div>
   </div>
-  <div id="list"></div>
+
+  <!-- PROJECT BAR -->
+  <div class="project-bar">
+    <select id="project-select">
+      <option value="">— select project —</option>
+    </select>
+    <button id="new-project-btn" class="icon-btn" title="New project">＋</button>
+    <button id="delete-project-btn" class="icon-btn danger" title="Delete project">🗑</button>
+  </div>
+
+  <!-- PROJECT STATS -->
+  <div id="project-stats" class="project-stats hidden">
+    <span id="stat-tests">0 tests</span>
+    <span id="stat-keywords">0 keywords</span>
+    <span id="stat-variables">0 variables</span>
+    <span id="stat-storage"></span>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab active" data-tab="dom">
+      <span class="tab-icon">◎</span> DOM
+      <span id="count-badge" class="count-badge">0</span>
+    </button>
+    <button class="tab" data-tab="csv">
+      <span class="tab-icon">◉</span> Tests
+      <span id="csv-count-badge" class="count-badge hidden">0</span>
+    </button>
+    <button class="tab" data-tab="generate">
+      <span class="tab-icon">⚡</span> Generate
+    </button>
+    <button class="tab" data-tab="files">
+      <span class="tab-icon">📄</span> Files
+    </button>
+  </div>
+
+  <!-- TAB PANELS -->
+
+  <!-- DOM CAPTURE -->
+  <div class="tab-panel active" id="tab-dom">
+    <div class="btn-grid">
+      <button id="inspect-btn" class="btn btn-blue">Click &amp; Extract</button>
+      <button id="extract-dom-btn" class="btn btn-amber">Extract DOM</button>
+    </div>
+    <button id="auto-crawl-btn" class="btn btn-ghost">Auto Crawl: OFF</button>
+    <div class="btn-grid">
+      <button id="copy-json-btn" class="btn btn-green">Copy DOM JSON</button>
+      <button id="clear-btn" class="btn btn-danger-ghost full">Clear Captured</button>
+    </div>
+    <div class="list-divider"><span>Captured Elements</span></div>
+    <div id="list"></div>
+  </div>
+
+  <!-- TEST CASES -->
+  <div class="tab-panel hidden" id="tab-csv">
+
+    <!-- CSV Upload row -->
+    <div class="row-with-actions">
+      <label class="file-label" id="csv-label">
+        📄 Upload TestRail CSV
+        <input id="csv-input" type="file" accept=".csv" />
+      </label>
+      <button id="clear-csv-btn" class="icon-btn danger" title="Clear CSV">✕</button>
+    </div>
+    <div id="csv-status" class="status-text"></div>
+
+    <!-- Manual add section -->
+    <div class="manual-add-header">
+      <span class="manual-add-title">Add Test Case Manually</span>
+      <button id="toggle-manual-btn" class="icon-btn" title="Add manually">＋</button>
+    </div>
+
+    <div id="manual-add-form" class="manual-add-form hidden">
+
+      <!-- ID + Title + Priority -->
+      <div class="manual-top-row">
+        <input id="manual-id"    type="text" class="manual-id-input"    placeholder="ID  e.g. C999" />
+        <select id="manual-priority" class="manual-priority-select">
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Critical">Critical</option>
+          <option value="Low">Low</option>
+        </select>
+      </div>
+      <input id="manual-title" type="text" class="manual-title-input" placeholder="Test case title" />
+      <input id="manual-precondition" type="text" class="manual-title-input manual-precondition-input" placeholder="Precondition (optional)" />
+
+      <!-- Steps header -->
+      <div class="manual-steps-header">
+        <span class="manual-col-label">Step</span>
+        <span class="manual-col-label">Expected Result</span>
+        <span class="manual-col-spacer"></span>
+      </div>
+
+      <!-- Dynamic step rows -->
+      <div id="manual-steps-list"></div>
+
+      <!-- Add step + Save row -->
+      <div class="manual-form-actions">
+        <button id="add-step-btn" class="btn btn-ghost">＋ Add Step</button>
+        <button id="save-manual-btn" class="btn btn-blue">Save Test Case</button>
+      </div>
+
+    </div>
+
+    <!-- Inline parsed / manual test cases -->
+    <div id="csv-parsed" class="csv-parsed hidden"></div>
+  </div>
+
+  <!-- GENERATE & EXPORT -->
+  <div class="tab-panel hidden" id="tab-generate">
+    <button id="generate-btn" class="btn btn-generate full">⚡ Generate Tests</button>
+    <button id="preview-prompt-btn" class="btn btn-ghost full">👁 Preview Payload</button>
+    <div id="generate-status" class="generate-status"></div>
+
+    <!-- Payload preview panel -->
+    <div id="payload-preview" class="payload-preview hidden">
+      <div class="payload-header">
+        <span id="payload-title">Payload Preview</span>
+        <button id="copy-payload-btn" class="icon-btn" title="Copy">Copy</button>
+        <button id="close-payload-btn" class="icon-close">✕</button>
+      </div>
+      <div class="payload-tabs">
+        <button class="payload-tab active" data-section="system">System</button>
+        <button class="payload-tab" data-section="user">User</button>
+        <button class="payload-tab" data-section="full">Full JSON</button>
+      </div>
+      <pre id="payload-content" class="payload-content"></pre>
+    </div>
+
+    <!-- REVIEW PANEL -->
+    <div id="review-panel" class="review-panel hidden">
+      <div class="review-header">
+        <div class="review-title">
+          <span class="review-title-icon">&#128196;</span>
+          <span>Review Generated Output</span>
+          <span class="review-subtitle">These are new additions only &mdash; not yet saved</span>
+        </div>
+        <div class="review-actions">
+          <button id="approve-btn" class="btn btn-approve">&#10003; Approve &amp; Save</button>
+          <button id="discard-btn" class="btn btn-discard">&#10005; Discard</button>
+        </div>
+      </div>
+      <div class="review-tabs">
+        <button class="review-tab active" data-file="variables.robot">variables</button>
+        <button class="review-tab" data-file="keywords.robot">keywords</button>
+        <button class="review-tab" data-file="tests.robot">tests</button>
+      </div>
+      <div id="review-viewer" class="review-viewer"></div>
+    </div>
+  </div>
+
+  <!-- FILES TAB -->
+  <div class="tab-panel hidden" id="tab-files">
+    <div class="files-toolbar">
+      <div class="file-tabs">
+        <button class="file-tab active" data-file="variables.robot">variables</button>
+        <button class="file-tab" data-file="keywords.robot">keywords</button>
+        <button class="file-tab" data-file="tests.robot">tests</button>
+      </div>
+      <button id="copy-file-btn"   class="icon-btn"        title="Copy file">Copy</button>
+      <button id="download-btn"    class="icon-btn"        title="Download all files">Download</button>
+      <button id="reset-files-btn" class="icon-btn danger" title="Reset all files">Reset</button>
+    </div>
+
+    <div id="file-viewer" class="file-viewer">
+      <div class="file-empty">No files generated yet for this project.</div>
+    </div>
+
+    <!-- Edit action bar — sits below the viewer -->
+    <div class="file-action-bar">
+      <button id="edit-file-btn"   class="btn btn-ghost">✎ Edit</button>
+      <button id="save-file-btn"   class="btn btn-blue hidden">💾 Save</button>
+      <button id="cancel-edit-btn" class="btn btn-danger-ghost hidden">✕ Cancel</button>
+    </div>
+  </div>
+
+  <script src="../utils/dom-utils.js"></script>
+  <script src="../utils/csv-parser.js"></script>
+  <script src="../utils/robot-merger.js"></script>
+  <script src="../utils/prompt-builder.js"></script>
+  <script src="../utils/storage.js"></script>
   <script src="panel.js"></script>
 </body>
 </html>

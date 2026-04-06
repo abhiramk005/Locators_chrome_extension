@@ -15,30 +15,30 @@ LOCATORS
 - Locator formats: id=, css=, xpath=, name=
 - Prefer id= and css= over xpath= where available
 
-═══════════════════════════════════════════════════════════════════
-WAIT STRATEGY — ALWAYS WAIT, NEVER ASSUME
-═══════════════════════════════════════════════════════════════════
-The target app may be a SPA — elements load asynchronously after every action.
-After clicking ANY button or link:
-  Wait Until Page Contains Element    \${locator}    timeout=15s
-After navigation:
-  Wait Until Page Contains Element    \${expected_element}    timeout=15s
-After opening a dialog or modal:
-  Wait Until Page Contains    \${dialog_header}    timeout=10s
-Sleep is ONLY allowed for brief UI animation delays (max 0.5s).
 
 ═══════════════════════════════════════════════════════════════════
 RULES
 ═══════════════════════════════════════════════════════════════════
-1. Use ONLY locators from the payload — never invent them
-2. Assert EVERY expected result — never use Log as a substitute
-3. Never click destructive buttons (delete, remove, clear) unless the test case explicitly requires it
-4. If an element is disabled — assert disabled state, do not click
-5. preconditions → implement as [Setup] keyword
-6. Tag each test: [Tags]    TC-{id}
-7. Every test that requires authentication must call the login keyword in [Setup]
-8. Reuse existing keywords and variables by their exact names — only return NEW definitions in your output
-9. Group related keywords logically — navigation, form input, assertions separately
+1. NEVER use raw locators (id=, css=, etc.) directly in keywords or test cases. ALWAYS create a corresponding variable in variables.robot and use that variable name instead.
+2. Use ONLY locators from the payload — never invent them
+3. Assert EVERY expected result — never use Log as a substitute
+4.MANDATORY SETUP: Every test case MUST have a [Setup] section.The first keyword in [Setup] MUST be 'Open Browser  \${BASE_URL}  \${BROWSER}'.
+5.MANDATORY TEARDOWN: Every test case MUST have a [Teardown]  Close Browser.
+6. Never click destructive buttons (delete, remove, clear) unless the test case explicitly requires it
+7. If an element is disabled — assert disabled state, do not click
+8. Tag each test: [Tags]    TC-{id}
+9. Every test that requires authentication must call the login keyword in [Setup]
+10. Reuse existing keywords and variables by their exact names — only return NEW definitions in your output
+11. Group related keywords logically — navigation, form input, assertions separately
+
+═══════════════════════════════════════════════════════════════════
+PRECONDITIONS & SETUP HANDLING
+═══════════════════════════════════════════════════════════════════
+- Analyze the \`preconditions\` field provided in the JSON payload for each test case.
+- Map the precondition to EXISTING KEYWORDS if possible. For example, if the precondition is "User is logged in", append your existing login keyword to the setup: \`[Setup]  Run Keywords  Open Browser  \${BASE_URL}  \${BROWSER}  AND  Your Existing Login Keyword\`
+- If the precondition requires a state that does NOT exist in the existing keywords (e.g., "User has added items to cart"), DO NOT write these steps directly in the test case body.
+- Instead, generate a NEW, reusable keyword in \`keywords.robot\` (e.g., \`Setup Cart With Items\`) and call that new keyword in the test case \`[Setup]\`.
+
 
 ASSERTIONS:
 - text visible    → Page Should Contain    \${text}
